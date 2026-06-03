@@ -1,0 +1,70 @@
+name: Build Desktop Apps
+
+# Runs every time you push code to GitHub
+on:
+  push:
+    branches: [main]
+  # Also lets you trigger it manually from GitHub website
+  workflow_dispatch:
+
+jobs:
+
+  # ── Build Mac (.dmg) ──────────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-latest        # GitHub gives us a real Mac machine for free
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Mac app
+        run: npm run package:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false   # Skip code signing (not needed for sharing)
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Mac installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoodboardCanvas-Mac
+          path: dist-app/*.dmg
+          retention-days: 30     # File stays downloadable for 30 days
+
+  # ── Build Windows (.exe) ─────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows app
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoodboardCanvas-Windows
+          path: dist-app/*.exe
+          retention-days: 30

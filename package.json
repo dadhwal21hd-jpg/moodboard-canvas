@@ -1,0 +1,83 @@
+{
+  "name": "moodboard-canvas",
+  "version": "1.0.0",
+  "description": "Infinite Canvas Image Organizer for Fashion & Product References",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package:win": "electron-vite build && electron-builder --win",
+    "package:mac": "electron-vite build && electron-builder --mac",
+    "package:linux": "electron-vite build && electron-builder --linux",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "electron-log": "^5.1.1",
+    "framer-motion": "^11.0.3",
+    "uuid": "^9.0.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/archiver": "^6.0.2",
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^28.1.3",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12"
+  },
+  "build": {
+    "appId": "com.rstudio.moodboard",
+    "productName": "Moodboard Canvas",
+    "copyright": "Copyright © 2025 R Studio",
+    "asar": true,
+    "directories": {
+      "output": "dist-app",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "!out/**/*.map"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "resources/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Moodboard Canvas",
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "resources/icon.png",
+      "category": "public.app-category.graphics-design"
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "resources/icon.png",
+      "category": "Graphics"
+    }
+  }
+}
