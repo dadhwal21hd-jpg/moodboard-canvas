@@ -24,7 +24,7 @@ interface CanvasBoxProps {
 
 export function CanvasBox({ box, canvasScale, screenToCanvas }: CanvasBoxProps): React.JSX.Element {
   const {
-    updateBoxLocal, removeBox, assignImagesToBox, unassignImagesFromBox,
+    updateBoxLocal, removeBox, assignImagesToBox, unassignImagesFromBox, moveImageBetweenBoxes,
     showContextMenu, setEditingBox, isEditingBox,
     dragState, clearDrag, getBoxImages, notify, selectedBoxId, selectBox
   } = useAppStore()
@@ -194,19 +194,44 @@ export function CanvasBox({ box, canvasScale, screenToCanvas }: CanvasBoxProps):
     const raw = e.dataTransfer.getData('application/moodboard-images')
     if (!raw) return
 
-    const imageIds: string[] = JSON.parse(raw)
+    // Drag data format: { imageIds: string[], fromBoxId: string | null }
+    // fromBoxId = null means coming from the sidebar tray
+    let imageIds: string[] = []
+    let fromBoxId: string | null = null
+
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        // Legacy format from tray
+        imageIds = parsed
+      } else {
+        imageIds = parsed.imageIds
+        fromBoxId = parsed.fromBoxId ?? null
+      }
+    } catch { return }
+
     if (imageIds.length === 0) return
 
     try {
-      await window.api.addImagesToBox(box.id, imageIds)
-      assignImagesToBox(box.id, imageIds)
-      notify('success', `Added ${imageIds.length} image${imageIds.length !== 1 ? 's' : ''} to "${box.name}"`)
-    } catch (err) {
-      notify('error', 'Failed to add images to box')
+      if (fromBoxId && fromBoxId !== box.id) {
+        // Box → Box: move (remove from source, add to target)
+        await window.api.removeImagesFromBox(fromBoxId, imageIds)
+        await window.api.addImagesToBox(box.id, imageIds)
+        moveImageBetweenBoxes(fromBoxId, box.id, imageIds)
+        notify('success', `Moved ${imageIds.length} image${imageIds.length !== 1 ? 's' : ''} to "${box.name}"`)
+      } else if (!fromBoxId) {
+        // Tray → Box: assign
+        await window.api.addImagesToBox(box.id, imageIds)
+        assignImagesToBox(box.id, imageIds)
+        notify('success', `Added ${imageIds.length} image${imageIds.length !== 1 ? 's' : ''} to "${box.name}"`)
+      }
+      // If fromBoxId === box.id: dropped on same box, do nothing
+    } catch {
+      notify('error', 'Failed to move images')
     }
 
     clearDrag()
-  }, [box.id, box.name, assignImagesToBox, notify, clearDrag])
+  }, [box.id, box.name, assignImagesToBox, moveImageBetweenBoxes, notify, clearDrag])
 
   // ── Remove image from box ─────────────────────────────────────────────────────
   const handleRemoveImage = useCallback(async (e: React.MouseEvent, imageId: string) => {
@@ -298,6 +323,7 @@ export function CanvasBox({ box, canvasScale, screenToCanvas }: CanvasBoxProps):
                 <BoxImageThumb
                   key={img.id}
                   image={img}
+                  boxId={box.id}
                   onRemove={(e) => handleRemoveImage(e, img.id)}
                 />
               ))}
@@ -323,17 +349,30 @@ export function CanvasBox({ box, canvasScale, screenToCanvas }: CanvasBoxProps):
 
 interface BoxImageThumbProps {
   image: ImageFile
+  boxId: string
   onRemove: (e: React.MouseEvent) => void
 }
 
-function BoxImageThumb({ image, onRemove }: BoxImageThumbProps): React.JSX.Element {
+function BoxImageThumb({ image, boxId, onRemove }: BoxImageThumbProps): React.JSX.Element {
   const { setPreviewImage } = useAppStore()
+
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    e.stopPropagation()
+    // Pack image ID + source box so the target knows it's a box-to-box move
+    e.dataTransfer.setData(
+      'application/moodboard-images',
+      JSON.stringify({ imageIds: [image.id], fromBoxId: boxId })
+    )
+    e.dataTransfer.effectAllowed = 'move'
+  }, [image.id, boxId])
 
   return (
     <div
       className="box-image-thumb"
       onClick={() => setPreviewImage(image.id)}
-      title={image.fileName}
+      draggable
+      onDragStart={handleDragStart}
+      title={`${image.fileName} — drag to move to another box`}
     >
       <img
         src={toLocalFileUrl(image.filePath)}

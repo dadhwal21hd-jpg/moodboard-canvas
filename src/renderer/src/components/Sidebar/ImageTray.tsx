@@ -23,7 +23,7 @@ export function ImageTray(): React.JSX.Element {
     images, filteredImages, selectedImageIds,
     selectImage, clearSelection, setDragState, clearDrag,
     searchQuery, setSearchQuery, showUnassignedOnly, setShowUnassigned,
-    notify
+    removeImage, notify
   } = useAppStore()
 
   const displayImages = filteredImages()
@@ -137,6 +137,10 @@ export function ImageTray(): React.JSX.Element {
               selectedCount={selectedImageIds.size}
               allSelectedIds={selectedImageIds}
               onSelect={selectImage}
+              onRemove={async (id) => {
+                await window.api.deleteImage(id)
+                removeImage(id)
+              }}
               onDragStart={() => setDragState({ isDragging: true, imageIds: Array.from(selectedImageIds.has(img.id) ? selectedImageIds : new Set([img.id])) })}
               onDragEnd={clearDrag}
             />
@@ -155,17 +159,17 @@ interface TrayImageProps {
   selectedCount: number
   allSelectedIds: Set<string>
   onSelect: (id: string, multi: boolean) => void
+  onRemove: (id: string) => void
   onDragStart: () => void
   onDragEnd: () => void
 }
 
 function TrayImage({
-  image, isSelected, selectedCount, allSelectedIds, onSelect, onDragStart, onDragEnd
+  image, isSelected, selectedCount, allSelectedIds, onSelect, onRemove, onDragStart, onDragEnd
 }: TrayImageProps): React.JSX.Element {
   const { setPreviewImage } = useAppStore()
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Ctrl/Cmd click = multi-select; regular click = single select
     onSelect(image.id, e.ctrlKey || e.metaKey)
   }, [image.id, onSelect])
 
@@ -173,19 +177,18 @@ function TrayImage({
     setPreviewImage(image.id)
   }, [image.id, setPreviewImage])
 
-  // HTML5 drag start — pack image IDs into the drag event
   const handleDragStart = useCallback((e: React.DragEvent) => {
-    // If this image is selected, drag ALL selected images
-    // If not selected, drag just this one
     const dragIds = allSelectedIds.has(image.id)
       ? Array.from(allSelectedIds)
       : [image.id]
 
-    // Store the IDs in dataTransfer so the drop target can read them
-    e.dataTransfer.setData('application/moodboard-images', JSON.stringify(dragIds))
+    // fromBoxId: null means coming from the tray
+    e.dataTransfer.setData(
+      'application/moodboard-images',
+      JSON.stringify({ imageIds: dragIds, fromBoxId: null })
+    )
     e.dataTransfer.effectAllowed = 'link'
 
-    // Show count badge on drag ghost
     if (dragIds.length > 1) {
       const ghost = document.createElement('div')
       ghost.className = 'drag-ghost'
@@ -197,6 +200,11 @@ function TrayImage({
 
     onDragStart()
   }, [image.id, allSelectedIds, onDragStart])
+
+  const handleRemove = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onRemove(image.id)
+  }, [image.id, onRemove])
 
   return (
     <div
@@ -215,6 +223,14 @@ function TrayImage({
         decoding="async"
       />
       <div className="tray-image-name">{image.fileName}</div>
+      {/* Remove button — shows on hover via CSS */}
+      <button
+        className="tray-image-remove"
+        onClick={handleRemove}
+        title="Remove from library"
+      >
+        ✕
+      </button>
     </div>
   )
 }

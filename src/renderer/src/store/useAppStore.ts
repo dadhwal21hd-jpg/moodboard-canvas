@@ -59,6 +59,7 @@ interface AppState {
   // Box ↔ Image assignments
   assignImagesToBox: (boxId: string, imageIds: string[]) => void
   unassignImagesFromBox: (boxId: string, imageIds: string[]) => void
+  moveImageBetweenBoxes: (fromBoxId: string, toBoxId: string, imageIds: string[]) => void
 
   // ── Actions: Canvas ──────────────────────────────────────────────────────────
   setCanvasTransform: (transform: CanvasTransform) => void
@@ -106,7 +107,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   previewImageId: null,
   notifications: [],
   searchQuery: '',
-  showUnassignedOnly: false,
+  showUnassignedOnly: true,
 
   // ── Load Data from Main Process ───────────────────────────────────────────────
   loadData: async () => {
@@ -205,6 +206,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!box) return {}
       const removeSet = new Set(imageIds)
       boxes.set(boxId, { ...box, imageIds: box.imageIds.filter(id => !removeSet.has(id)) })
+      return { boxes }
+    }),
+
+  // Move images from one box to another (box-to-box drag)
+  moveImageBetweenBoxes: (fromBoxId, toBoxId, imageIds) =>
+    set(state => {
+      if (fromBoxId === toBoxId) return {}
+      const boxes = new Map(state.boxes)
+      const fromBox = boxes.get(fromBoxId)
+      const toBox = boxes.get(toBoxId)
+      if (!fromBox || !toBox) return {}
+
+      const moveSet = new Set(imageIds)
+      // Remove from source
+      boxes.set(fromBoxId, { ...fromBox, imageIds: fromBox.imageIds.filter(id => !moveSet.has(id)) })
+      // Add to target (avoid duplicates)
+      const existingInTarget = new Set(toBox.imageIds)
+      const newIds = imageIds.filter(id => !existingInTarget.has(id))
+      boxes.set(toBoxId, { ...toBox, imageIds: [...toBox.imageIds, ...newIds] })
       return { boxes }
     }),
 
